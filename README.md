@@ -37,7 +37,7 @@ Every case calls Spring Boot's `ObjectMapper` by hand, as a DAO would for a JSON
 | `RuntimeHintsRegistrar` using `BindingReflectionHintsRegistrar` | must work |
 | `@RequestBody` / return type of a `@RestController`, nothing registered by hand | must work |
 | Not known at all | must fail |
-| `@JsonSubTypes` subtypes behind a registered root | observed, not asserted |
+| `@JsonSubTypes` subtypes behind a registered root | observed, not asserted: fails on Spring Boot 3.5.6, so name every subtype |
 
 ```
 cd spring-boot-binding
