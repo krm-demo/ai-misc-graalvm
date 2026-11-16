@@ -1,0 +1,21 @@
+[
+  {
+    "id": "p-1",
+    "name": "Monthly sweep",
+    "createdAt": "2026-11-01T09:30:00Z",
+    "owner": "treasury",
+    "limits": { "min": 100, "max": 5000 }
+  },
+  {
+    "id": "p-2",
+    "name": "Weekly top-up",
+    "createdAt": "2026-11-08T14:05:00Z",
+    "tags": ["weekly", "auto"]
+  },
+  {
+    "id": "p-3",
+    "name": "One-off transfer",
+    "owner": null,
+    "retries": 3
+  }
+]
