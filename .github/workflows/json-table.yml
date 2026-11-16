@@ -17,6 +17,7 @@ permissions:
 
 defaults:
   run:
+    shell: bash          # bash with pipefail, so a failure before '| tee' fails the step
     working-directory: json-table
 
 jobs:
@@ -24,7 +25,7 @@ jobs:
     name: Regular JVM (Temurin 21)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -40,7 +41,7 @@ jobs:
     name: GraalVM native image (JDK 25)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: graalvm/setup-graalvm@v1
         with:
           distribution: graalvm
