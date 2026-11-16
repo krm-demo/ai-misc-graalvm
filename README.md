@@ -25,3 +25,24 @@ mvn -Pnative test   # JVM, then native (needs GraalVM with native-image)
 
 Per-case results are written to `target/jackson-cases-jvm.txt` and `target/jackson-cases-native.txt`.
 The `native-tests` GitHub workflow runs both and prints the results in the run summary.
+
+## Spring Boot AOT and Jackson
+
+`spring-boot-binding/` is a separate Maven project (Spring Boot parent) with `SpringBindingNativeImageTest`.
+Every case calls Spring Boot's `ObjectMapper` by hand, as a DAO would for a JSON column.
+
+| How the type is known to Spring AOT | Native image |
+| --- | --- |
+| `@RegisterReflectionForBinding(Root.class)`, nested types not named | must work |
+| `RuntimeHintsRegistrar` using `BindingReflectionHintsRegistrar` | must work |
+| `@RequestBody` / return type of a `@RestController`, nothing registered by hand | must work |
+| Not known at all | must fail |
+| `@JsonSubTypes` subtypes behind a registered root | observed, not asserted |
+
+```
+cd spring-boot-binding
+mvn test               # JVM only
+mvn -PnativeTest test  # JVM, then native
+```
+
+Results are written to `spring-boot-binding/target/spring-cases-*.txt` and shown in the workflow run summary.
