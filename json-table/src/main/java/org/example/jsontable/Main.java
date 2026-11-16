@@ -113,7 +113,7 @@ public final class Main {
             return "";
         }
         // Objects and arrays as pretty JSON; scalars as plain text. (asString() is the Jackson 3 name of asText().)
-        return node.isContainerNode() ? node.toPrettyString() : node.asString();
+        return node.isObject() || node.isArray() ? node.toPrettyString() : node.asString();
     }
 
     private static String pad(String s, int width) {
