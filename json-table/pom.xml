@@ -15,6 +15,7 @@
     <!-- Check Maven Central for the newest versions of these three. -->
     <jackson.version>3.2.1</jackson.version>
     <lombok.version>1.18.46</lombok.version>
+    <picocli.version>4.7.7</picocli.version>
     <native.plugin.version>0.11.3</native.plugin.version>
   </properties>
 
@@ -24,6 +25,11 @@
       <groupId>tools.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>
       <version>${jackson.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>info.picocli</groupId>
+      <artifactId>picocli</artifactId>
+      <version>${picocli.version}</version>
     </dependency>
     <dependency>
       <groupId>org.projectlombok</groupId>
@@ -47,7 +53,16 @@
               <artifactId>lombok</artifactId>
               <version>${lombok.version}</version>
             </path>
+            <!-- Generates the native-image reflection config for the @Command class. -->
+            <path>
+              <groupId>info.picocli</groupId>
+              <artifactId>picocli-codegen</artifactId>
+              <version>${picocli.version}</version>
+            </path>
           </annotationProcessorPaths>
+          <compilerArgs>
+            <arg>-Aproject=${project.groupId}/${project.artifactId}</arg>
+          </compilerArgs>
         </configuration>
       </plugin>
 

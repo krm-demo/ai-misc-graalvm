@@ -35,7 +35,9 @@ jobs:
       - name: Run with a file argument
         run: ./run-jvm.sh sample.json
       - name: Run with standard input
-        run: cat sample.json | ./run-jvm.sh
+        run: cat sample.json | ./run-jvm.sh -
+      - name: Help, exit codes and error messages
+        run: ./smoke-test.sh java -jar target/json-table-1.0.jar
 
   native:
     name: GraalVM native image (JDK 25)
@@ -53,6 +55,14 @@ jobs:
       - name: Run the native executable
         run: ./run-native.sh sample.json | tee native.txt
       - name: Run the native executable with standard input
-        run: cat sample.json | ./run-native.sh
+        run: cat sample.json | ./run-native.sh -
       - name: Both must print the same table
         run: diff jvm.txt native.txt
+      - name: The jq script must print the same table too
+        run: ./json-table-jq.sh sample.json | diff - native.txt
+      - name: Help, exit codes and error messages (native)
+        run: ./smoke-test.sh target/json-table
+      - name: Coloured example for the documentation
+        run: |
+          target/json-table --color=always --date-only sample.json | tee showcase.ansi
+          echo "SHOWCASE-BASE64: $(base64 < showcase.ansi | tr -d '\n')"

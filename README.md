@@ -46,3 +46,12 @@ mvn -PnativeTest test  # JVM, then native
 ```
 
 Results are written to `spring-boot-binding/target/spring-cases-*.txt` and shown in the workflow run summary.
+
+## json-table
+
+[`json-table/`](json-table/README.md) is a small command-line tool (Jackson 3, Picocli) that prints a JSON array of objects as a table,
+with the same program in jq, Go, Node.js and Python and a start-up benchmark of all of them on several JVMs and as a GraalVM native executable.
+
+![json-table --date-only sample.json](json-table/docs/example.svg)
+
+See [json-table/README.md](json-table/README.md) for usage, the benchmark set-up and the results.

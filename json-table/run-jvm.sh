@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Runs the ordinary JVM build. Build it first with:  mvn package
-# Usage: ./run-jvm.sh sample.json     or     cat sample.json | ./run-jvm.sh
+# Usage: ./run-jvm.sh sample.json     or     cat sample.json | ./run-jvm.sh -
 # On macOS install coreutils and replace "date" with "gdate" (the stock date has no %N).
 cd "$(dirname "$0")" || exit 1
 
