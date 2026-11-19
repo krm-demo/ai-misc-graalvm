@@ -1,0 +1,82 @@
+[
+  {
+    "name": "org.krmdemo.graalvm.jackson.PlainRecord",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allPublicMethods": true,
+    "allRecordComponents": true
+  },
+  {
+    "name": "org.krmdemo.graalvm.jackson.OrderItem",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allPublicMethods": true,
+    "allRecordComponents": true
+  },
+  {
+    "name": "org.krmdemo.graalvm.jackson.Order",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allPublicMethods": true,
+    "allRecordComponents": true
+  },
+  {
+    "name": "org.krmdemo.graalvm.jackson.Basket",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allPublicMethods": true,
+    "allRecordComponents": true
+  },
+  {
+    "name": "org.krmdemo.graalvm.jackson.Shape",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allPublicMethods": true,
+    "allRecordComponents": true
+  },
+  {
+    "name": "org.krmdemo.graalvm.jackson.Shape$Circle",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allPublicMethods": true,
+    "allRecordComponents": true
+  },
+  {
+    "name": "org.krmdemo.graalvm.jackson.Shape$Square",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allPublicMethods": true,
+    "allRecordComponents": true
+  },
+  {
+    "name": "org.krmdemo.graalvm.jackson.Person",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allPublicMethods": true,
+    "allRecordComponents": true
+  },
+  {
+    "name": "org.krmdemo.graalvm.jackson.Person$Builder",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allPublicMethods": true,
+    "allRecordComponents": true
+  },
+  {
+    "name": "org.krmdemo.graalvm.jackson.LegacyBean",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true,
+    "allPublicMethods": true,
+    "allRecordComponents": true
+  }
+]
