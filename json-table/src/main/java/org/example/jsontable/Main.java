@@ -54,8 +54,8 @@ import tools.jackson.databind.json.JsonMapper;
             "",
             "    [ { \"id\": \"p-1\", \"name\": \"Monthly sweep\", \"owner\": \"treasury\" } ]",
             "",
-            "  @|bold id|@, @|bold name|@   text, each in its own column",
-            "  @|bold createdAt|@  ISO-8601 instant, in its own column",
+            "  @|bold id|@, @|bold name|@        text, each in its own column",
+            "  @|bold createdAt|@       ISO-8601 instant, in its own column",
             "  @|yellow anything else|@   one extra column per property; nested objects",
             "                  and arrays are shown as pretty JSON",
             ""
