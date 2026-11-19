@@ -49,21 +49,9 @@ Results are written to `spring-boot-binding/target/spring-cases-*.txt` and shown
 
 ## json-table
 
-`json-table/` is a small command-line tool (Jackson 3, Picocli) that prints a JSON array of objects as a table.
+[`json-table/`](json-table/README.md) is a small command-line tool (Jackson 3, Picocli) that prints a JSON array of objects as a table,
+with the same program in jq, Go, Node.js and Python and a start-up benchmark of all of them on several JVMs and as a GraalVM native executable.
 
-```
-cd json-table
-mvn package                 # target/json-table-1.0.jar
-mvn -Pnative package        # also target/json-table (needs GraalVM)
+![json-table --date-only sample.json](json-table/docs/example.svg)
 
-./run-jvm.sh sample.json
-cat sample.json | ./run-native.sh -
-java -jar target/json-table-1.0.jar --help
-```
-
-- Without arguments, or with `--help`, it prints what input it expects.
-- Errors are one line (`FILE NOT FOUND:`, `INVALID JSON:`, `INVALID DATA:`, `USAGE ERROR:` ...); add `--debug` for the stack trace.
-- `json-table-jq.sh` prints the same table with `jq` only.
-- `alt/` holds the same program in Go, Node.js and Python (standard libraries only, no colours).
-- `smoke-test.sh` checks help, exit codes and error messages for either build.
-- The `json-table-bench` workflow times all of them with `hyperfine`: four JVMs, the native executable, jq, Go, Node.js and Python, on three platforms and three input sizes. Each job writes its report to the run summary.
+See [json-table/README.md](json-table/README.md) for usage, the benchmark set-up and the results.

@@ -10,7 +10,7 @@ Usage: json-table-jq.sh [--debug] FILE
 Prints a JSON array of objects as a table.
 
 Expected input: a JSON array whose elements are objects, for example
-  [ { "id": "p-1", "name": "Monthly sweep", "owner": "treasury" } ]
+  [ { "id": "T-1", "name": "Fix the login page", "assignee": "anna" } ]
 
   id, name       text, each in its own column
   createdAt      ISO-8601 instant, in its own column (printed as it is written)

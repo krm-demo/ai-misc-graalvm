@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Writes the Markdown report of one benchmark job to standard output.
 # The workflow appends it to $GITHUB_STEP_SUMMARY; locally:  ROWS=10 ./bench-summary.sh > summary.md
-# Expects in the current folder: bench.md (from hyperfine), versions.txt, machine.txt, sample.json, target/json-table.
+# Expects in the current folder: bench.json (from hyperfine), versions.txt, machine.txt, sample.json, target/json-table.
 cd "$(dirname "$0")" || exit 1
 rows=${ROWS:-?}
 src=${SRC_URL:-.}
@@ -22,10 +22,22 @@ cat <<MD
 Every candidate is the same small program: read a JSON array of objects from a file and print it as a text table.
 The time is for the **whole process**: starting the runtime, reading and parsing \`data.json\` ($rows rows, $(wc -c < data.json | tr -d ' ') bytes),
 building the table and writing it to a discarded output. [hyperfine](https://github.com/sharkdp/hyperfine) ran each command
-several times after warm-up runs; "Relative" is the mean divided by the fastest mean.
+several times after warm-up runs. The table is sorted, fastest first; "Relative" is the mean divided by the fastest mean.
 
 MD
-cat bench.md 2>/dev/null || echo "_no results: the benchmark step did not finish_"
+# The table is built from hyperfine's JSON, because its own Markdown layout differs between versions.
+if [ -s bench.json ]; then
+  jq -r '
+    def human: if . >= 1 then (. * 100 | round / 100 | tostring) + " s" elif . >= 0.01 then (. * 10000 | round / 10 | tostring) + " ms" else (. * 100000 | round / 100 | tostring) + " ms" end;
+    (.results | map(.mean) | min) as $best
+    | "| Candidate | Mean | ± | Min | Max | Relative |",
+      "| :--- | ---: | ---: | ---: | ---: | ---: |",
+      (.results | sort_by(.mean)[]
+        | "| \(.command) | **\(.mean | human)** | \(.stddev | human) | \(.min | human) | \(.max | human) | \(.mean / $best * 100 | round / 100) |")
+  ' bench.json
+else
+  echo "_no results: the benchmark step did not finish_"
+fi
 cat <<MD
 
 > All candidates of this job ran on the same machine, one after another, so the rows of this table are comparable.
