@@ -63,7 +63,7 @@ if type != "array" then error("the input is not a JSON array") else . end
     if ($known | index($key)) != null or index($key) != null then . else . + [$key] end)) as $extra
 | ($known + ($extra | map(tojson))) as $headers
 | [$items[] | . as $item
-    | [($known[] | $item[.] | text), ($extra[] | $item[.] | cell)] | map(split("\n"))] as $rows
+    | [($known[] | $item[.] | text), ($extra[] | $item[.] | cell)] | map(split("\n") | if length == 0 then [""] else . end)] as $rows
 | [range($headers | length) as $c
     | [($headers[$c] | length), ($rows[] | .[$c][] | length)] | max] as $widths
 | ($widths | map("─" * .) | join("─┼─")) as $rule

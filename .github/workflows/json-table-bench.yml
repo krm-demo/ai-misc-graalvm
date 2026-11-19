@@ -1,8 +1,11 @@
 name: json-table-bench
+run-name: json-table-bench №${{ github.run_number }} (${{ github.event_name }})
 
-# Start-up + run time of json-table on several JVMs, as a GraalVM native executable,
-# and of the jq script. All candidates of one job run on the same machine, so only
-# numbers inside one job are comparable. The matrix varies the size of the input.
+# Whole-process time (start-up + work) of json-table on several JVMs, as a GraalVM native
+# executable, and of the same program written with jq, Go, Node.js and Python.
+# All candidates of one job run on the same machine, so only numbers inside one job
+# are comparable. The matrix varies the platform and the size of the input.
+# Each job writes its report to the run summary (see json-table/bench-summary.sh).
 
 on:
   pull_request:
@@ -21,13 +24,17 @@ defaults:
 
 jobs:
   bench:
-    name: ${{ matrix.rows }} rows
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
+    name: ${{ matrix.os }}, ${{ matrix.rows }} rows
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest]
         rows: [10, 1000, 100000]
+    env:
+      ROWS: ${{ matrix.rows }}
+      SRC_URL: ${{ github.server_url }}/${{ github.repository }}/blob/${{ github.event.pull_request.head.sha || github.sha }}/json-table
     steps:
       - uses: actions/checkout@v5
 
@@ -49,7 +56,7 @@ jobs:
           java-version: '25'
       - run: echo "JAVA_ZULU=$JAVA_HOME" >> "$GITHUB_ENV"
 
-      # Last, so that Maven and native-image use GraalVM.
+      # Last of the JDKs, so that Maven and native-image use GraalVM.
       - uses: graalvm/setup-graalvm@v1
         with:
           distribution: graalvm
@@ -58,53 +65,102 @@ jobs:
           cache: maven
       - run: echo "JAVA_GRAALVM=$JAVA_HOME" >> "$GITHUB_ENV"
 
-      - name: Build the jar and the native executable
-        run: mvn -B -ntp -Pnative package
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+
+      - name: Build the jar, the native executable and the Go executable
+        run: |
+          mvn -B -ntp -Pnative package
+          go build -C alt/go -o ../../target/json-table-go .
 
       - name: Install hyperfine
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq hyperfine
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            sudo apt-get update -qq && sudo apt-get install -y -qq hyperfine
+          else
+            brew install hyperfine
+          fi
 
       - name: Generate the input
         run: |
-          jq -n --argjson n '${{ matrix.rows }}' '[range($n) | {
+          jq -n --argjson n "$ROWS" '[range($n) | {
             id: "p-\(.)", name: "Plan number \(.)", createdAt: "2026-11-01T09:30:00Z",
             owner: "team-\(. % 7)", limits: {min: ., max: (. * 2)}, tags: ["weekly", "auto"]
           }]' > data.json
           ls -l data.json
 
-      - name: Versions
+      - name: Machine and versions
         run: |
-          for home in "$JAVA_CORRETTO" "$JAVA_ORACLE" "$JAVA_ZULU" "$JAVA_GRAALVM"; do
-            "$home/bin/java" -version 2>&1 | sed -n 2p
-          done
-          jq --version
-          hyperfine --version
+          {
+            echo "${{ matrix.os }} ($(uname -sm))"
+            if [ "$RUNNER_OS" = Linux ]; then lscpu | grep -E '^(Model name|CPU\(s\)|Architecture)'; else sysctl -n machdep.cpu.brand_string hw.ncpu; fi
+          } | tee machine.txt
+          {
+            for home in "$JAVA_CORRETTO" "$JAVA_ORACLE" "$JAVA_ZULU" "$JAVA_GRAALVM"; do
+              "$home/bin/java" -version 2>&1 | sed -n 2p
+            done
+            echo "native-image: $("$JAVA_GRAALVM/bin/native-image" --version | head -1)"
+            jq --version
+            go version
+            echo "node $(node --version)"
+            python3 --version
+            hyperfine --version
+          } | tee versions.txt
 
       - name: All candidates print the same table
         run: |
-          target/json-table data.json 2>/dev/null | sha256sum | tee native.sum
-          for home in "$JAVA_CORRETTO" "$JAVA_ORACLE" "$JAVA_ZULU" "$JAVA_GRAALVM"; do
-            "$home/bin/java" -jar target/json-table-1.0.jar data.json 2>/dev/null | sha256sum | diff - native.sum
-          done
-          ./json-table-jq.sh data.json | sha256sum | diff - native.sum
+          target/json-table data.json 2>/dev/null > expected.txt
+          wc -l expected.txt
+          same() {
+            local name=$1; shift
+            if "$@" 2>/dev/null | cmp -s - expected.txt; then echo "same:      $name"; else echo "DIFFERENT: $name"; return 1; fi
+          }
+          jar=target/json-table-1.0.jar
+          same 'Corretto'      "$JAVA_CORRETTO/bin/java" -jar $jar data.json
+          same 'Oracle JDK'    "$JAVA_ORACLE/bin/java" -jar $jar data.json
+          same 'Zulu'          "$JAVA_ZULU/bin/java" -jar $jar data.json
+          same 'GraalVM (JIT)' "$JAVA_GRAALVM/bin/java" -jar $jar data.json
+          same 'jq + bash'     ./json-table-jq.sh data.json
+          same 'Go'            target/json-table-go data.json
+          same 'Node.js'       node alt/json-table.mjs data.json
+          same 'Python'        python3 alt/json_table.py data.json
 
       - name: Benchmark
         run: |
           jar=target/json-table-1.0.jar
-          hyperfine -N --warmup 2 --runs 15 --export-markdown bench.md \
+          runs=15; if [ "$ROWS" -ge 100000 ]; then runs=7; fi
+          hyperfine -N --warmup 2 --runs $runs --export-markdown bench.md --export-json bench.json \
             -n 'Corretto 25'         "$JAVA_CORRETTO/bin/java -jar $jar data.json" \
             -n 'Oracle JDK 25'       "$JAVA_ORACLE/bin/java -jar $jar data.json" \
             -n 'Zulu 25'             "$JAVA_ZULU/bin/java -jar $jar data.json" \
             -n 'GraalVM 25 (JIT)'    "$JAVA_GRAALVM/bin/java -jar $jar data.json" \
             -n 'GraalVM 25 (native)' "target/json-table data.json" \
-            -n 'jq + bash'           "./json-table-jq.sh data.json"
+            -n 'jq + bash'           "./json-table-jq.sh data.json" \
+            -n 'Go'                  "target/json-table-go data.json" \
+            -n 'Node.js 24'          "node alt/json-table.mjs data.json" \
+            -n 'Python 3.14'         "python3 alt/json_table.py data.json"
 
-      - name: Results
+      - name: Report
         if: always()
         run: |
           cat bench.md || true
-          {
-            echo '### json-table, ${{ matrix.rows }} rows'
-            echo
-            cat bench.md 2>/dev/null || echo 'no results'
-          } >> "$GITHUB_STEP_SUMMARY"
+          ./bench-summary.sh >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bench-${{ matrix.os }}-${{ matrix.rows }}
+          path: |
+            json-table/bench.md
+            json-table/bench.json
+            json-table/versions.txt
+            json-table/machine.txt
+          if-no-files-found: ignore

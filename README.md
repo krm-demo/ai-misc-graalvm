@@ -64,5 +64,6 @@ java -jar target/json-table-1.0.jar --help
 - Without arguments, or with `--help`, it prints what input it expects.
 - Errors are one line (`FILE NOT FOUND:`, `INVALID JSON:`, `INVALID DATA:`, `USAGE ERROR:` ...); add `--debug` for the stack trace.
 - `json-table-jq.sh` prints the same table with `jq` only.
+- `alt/` holds the same program in Go, Node.js and Python (standard libraries only, no colours).
 - `smoke-test.sh` checks help, exit codes and error messages for either build.
-- The `json-table-bench` workflow times several JVMs, the native executable and the jq script with `hyperfine`, for three input sizes.
+- The `json-table-bench` workflow times all of them with `hyperfine`: four JVMs, the native executable, jq, Go, Node.js and Python, on three platforms and three input sizes. Each job writes its report to the run summary.
