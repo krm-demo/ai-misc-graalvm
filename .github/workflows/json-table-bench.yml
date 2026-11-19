@@ -1,0 +1,110 @@
+name: json-table-bench
+
+# Start-up + run time of json-table on several JVMs, as a GraalVM native executable,
+# and of the jq script. All candidates of one job run on the same machine, so only
+# numbers inside one job are comparable. The matrix varies the size of the input.
+
+on:
+  pull_request:
+    paths:
+      - 'json-table/**'
+      - '.github/workflows/json-table-bench.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+    working-directory: json-table
+
+jobs:
+  bench:
+    name: ${{ matrix.rows }} rows
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        rows: [10, 1000, 100000]
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: corretto
+          java-version: '25'
+      - run: echo "JAVA_CORRETTO=$JAVA_HOME" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: oracle
+          java-version: '25'
+      - run: echo "JAVA_ORACLE=$JAVA_HOME" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '25'
+      - run: echo "JAVA_ZULU=$JAVA_HOME" >> "$GITHUB_ENV"
+
+      # Last, so that Maven and native-image use GraalVM.
+      - uses: graalvm/setup-graalvm@v1
+        with:
+          distribution: graalvm
+          java-version: '25'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          cache: maven
+      - run: echo "JAVA_GRAALVM=$JAVA_HOME" >> "$GITHUB_ENV"
+
+      - name: Build the jar and the native executable
+        run: mvn -B -ntp -Pnative package
+
+      - name: Install hyperfine
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq hyperfine
+
+      - name: Generate the input
+        run: |
+          jq -n --argjson n '${{ matrix.rows }}' '[range($n) | {
+            id: "p-\(.)", name: "Plan number \(.)", createdAt: "2026-11-01T09:30:00Z",
+            owner: "team-\(. % 7)", limits: {min: ., max: (. * 2)}, tags: ["weekly", "auto"]
+          }]' > data.json
+          ls -l data.json
+
+      - name: Versions
+        run: |
+          for home in "$JAVA_CORRETTO" "$JAVA_ORACLE" "$JAVA_ZULU" "$JAVA_GRAALVM"; do
+            "$home/bin/java" -version 2>&1 | sed -n 2p
+          done
+          jq --version
+          hyperfine --version
+
+      - name: All candidates print the same table
+        run: |
+          target/json-table data.json 2>/dev/null | sha256sum | tee native.sum
+          for home in "$JAVA_CORRETTO" "$JAVA_ORACLE" "$JAVA_ZULU" "$JAVA_GRAALVM"; do
+            "$home/bin/java" -jar target/json-table-1.0.jar data.json 2>/dev/null | sha256sum | diff - native.sum
+          done
+          ./json-table-jq.sh data.json | sha256sum | diff - native.sum
+
+      - name: Benchmark
+        run: |
+          jar=target/json-table-1.0.jar
+          hyperfine -N --warmup 2 --runs 15 --export-markdown bench.md \
+            -n 'Corretto 25'         "$JAVA_CORRETTO/bin/java -jar $jar data.json" \
+            -n 'Oracle JDK 25'       "$JAVA_ORACLE/bin/java -jar $jar data.json" \
+            -n 'Zulu 25'             "$JAVA_ZULU/bin/java -jar $jar data.json" \
+            -n 'GraalVM 25 (JIT)'    "$JAVA_GRAALVM/bin/java -jar $jar data.json" \
+            -n 'GraalVM 25 (native)' "target/json-table data.json" \
+            -n 'jq + bash'           "./json-table-jq.sh data.json"
+
+      - name: Results
+        if: always()
+        run: |
+          cat bench.md || true
+          {
+            echo '### json-table, ${{ matrix.rows }} rows'
+            echo
+            cat bench.md 2>/dev/null || echo 'no results'
+          } >> "$GITHUB_STEP_SUMMARY"

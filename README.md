@@ -46,3 +46,23 @@ mvn -PnativeTest test  # JVM, then native
 ```
 
 Results are written to `spring-boot-binding/target/spring-cases-*.txt` and shown in the workflow run summary.
+
+## json-table
+
+`json-table/` is a small command-line tool (Jackson 3, Picocli) that prints a JSON array of objects as a table.
+
+```
+cd json-table
+mvn package                 # target/json-table-1.0.jar
+mvn -Pnative package        # also target/json-table (needs GraalVM)
+
+./run-jvm.sh sample.json
+cat sample.json | ./run-native.sh -
+java -jar target/json-table-1.0.jar --help
+```
+
+- Without arguments, or with `--help`, it prints what input it expects.
+- Errors are one line (`FILE NOT FOUND:`, `INVALID JSON:`, `INVALID DATA:`, `USAGE ERROR:` ...); add `--debug` for the stack trace.
+- `json-table-jq.sh` prints the same table with `jq` only.
+- `smoke-test.sh` checks help, exit codes and error messages for either build.
+- The `json-table-bench` workflow times several JVMs, the native executable and the jq script with `hyperfine`, for three input sizes.
