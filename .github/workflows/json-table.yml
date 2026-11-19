@@ -1,0 +1,58 @@
+name: json-table
+
+on:
+  pull_request:
+    paths:
+      - 'json-table/**'
+      - '.github/workflows/json-table.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'json-table/**'
+      - '.github/workflows/json-table.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash          # bash with pipefail, so a failure before '| tee' fails the step
+    working-directory: json-table
+
+jobs:
+  jvm:
+    name: Regular JVM (Temurin 21)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Build the jar
+        run: mvn -B -ntp package
+      - name: Run with a file argument
+        run: ./run-jvm.sh sample.json
+      - name: Run with standard input
+        run: cat sample.json | ./run-jvm.sh
+
+  native:
+    name: GraalVM native image (JDK 25)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: graalvm/setup-graalvm@v1
+        with:
+          distribution: graalvm
+          java-version: '25'
+      - name: Build the jar and the native executable
+        run: mvn -B -ntp -Pnative package
+      - name: Run on the JVM
+        run: ./run-jvm.sh sample.json | tee jvm.txt
+      - name: Run the native executable
+        run: ./run-native.sh sample.json | tee native.txt
+      - name: Run the native executable with standard input
+        run: cat sample.json | ./run-native.sh
+      - name: Both must print the same table
+        run: diff jvm.txt native.txt
