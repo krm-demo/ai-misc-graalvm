@@ -1,21 +1,25 @@
 [
   {
-    "id": "p-1",
-    "name": "Monthly sweep",
-    "createdAt": "2026-11-01T09:30:00Z",
-    "owner": "treasury",
-    "limits": { "min": 100, "max": 5000 }
+    "id": "T-1",
+    "name": "Fix the login page",
+    "createdAt": "2026-11-02T09:30:00Z",
+    "assignee": "anna",
+    "labels": ["bug", "ui"],
+    "estimate": { "days": 2, "risk": "low" }
   },
   {
-    "id": "p-2",
-    "name": "Weekly top-up",
-    "createdAt": "2026-11-08T14:05:00Z",
-    "tags": ["weekly", "auto"]
+    "id": "T-2",
+    "name": "Write release notes",
+    "createdAt": "2026-11-09T14:05:00Z",
+    "assignee": "boris",
+    "done": true
   },
   {
-    "id": "p-3",
-    "name": "One-off transfer",
-    "owner": null,
-    "retries": 3
+    "id": "T-3",
+    "name": "Upgrade to Java 25",
+    "createdAt": "2026-11-16T08:00:00Z",
+    "assignee": null,
+    "labels": ["build"],
+    "estimate": { "days": 5, "risk": "high" }
   }
 ]

@@ -49,10 +49,10 @@ run "$@" --version
 check "--version" 0 out '^json-table 1\.0$'
 
 run "$@" sample.json
-check "a file argument prints the table" 0 out 'Monthly sweep'
+check "a file argument prints the table" 0 out 'Fix the login page'
 
 "$@" - <sample.json >"$tmp/out" 2>"$tmp/err"; code=$?
-check "'-' reads standard input" 0 out 'Monthly sweep'
+check "'-' reads standard input" 0 out 'Fix the login page'
 
 run "$@" no-such-file.json
 check "missing file: one-line message" 1 err '^FILE NOT FOUND: no-such-file\.json$'
@@ -63,6 +63,21 @@ run "$@" --debug no-such-file.json
 check "missing file with --debug: message" 1 err '^FILE NOT FOUND: no-such-file\.json$'
 check "missing file with --debug: stack trace" 1 err 'NoSuchFileException'
 check "missing file with --debug: stack frames" 1 err 'at .*org\.example\.jsontable\.Main'
+
+run "$@" --date-only sample.json
+check "--date-only drops the time" 0 out '2026-11-02 '
+check "--date-only: no time left" 0 out 'T09:30' absent
+check "no timing lines by default" 0 err '^(start|end):' absent
+
+run "$@" --timing sample.json
+check "--timing prints the duration" 0 err '^end: .* took [0-9]+ ms$'
+
+run "$@" --color=always sample.json
+check "--color=always adds ANSI codes" 0 out $'\x1b\\[1;33m'
+run "$@" --color=never sample.json
+check "--color=never has no ANSI codes" 0 out $'\x1b' absent
+run "$@" --color=sometimes sample.json
+check "wrong --color value" 2 err "^USAGE ERROR: Invalid value for option '--color'"
 
 printf '[{"id": ' >"$tmp/broken.json"
 run "$@" "$tmp/broken.json"

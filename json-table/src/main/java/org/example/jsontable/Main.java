@@ -13,6 +13,8 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -25,10 +27,12 @@ import java.util.stream.StreamSupport;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Help;
+import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParameterException;
 import picocli.CommandLine.Parameters;
 import picocli.CommandLine.ParseResult;
+import picocli.CommandLine.Spec;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.DatabindException;
 import tools.jackson.databind.JsonNode;
@@ -37,7 +41,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Reads a JSON array of objects from a file, or from standard input when the argument is "-",
- * and prints it as a table. Timing lines go to standard error, so the table can be piped.
+ * and prints it as a table.
  * Without arguments it prints the help.
  */
 @Command(
@@ -91,12 +95,28 @@ public final class Main implements Callable<Integer> {
             description = "JSON file to read; use @|bold -|@ for standard input.")
     private String file;
 
+    @Option(names = "--date-only",
+            description = "Show @|bold createdAt|@ as a date (UTC), without the time.")
+    private boolean dateOnly;
+
+    @Option(names = "--color", paramLabel = "WHEN",
+            description = "@|bold auto|@ (default: colours only on a terminal and without NO_COLOR), "
+                    + "@|bold always|@ or @|bold never|@.")
+    private String colorMode = "auto";
+
+    @Option(names = "--timing",
+            description = "Print the start time, the end time and the duration to standard error.")
+    private boolean timing;
+
     @Option(names = "--debug",
             description = "On error, print the full stack trace instead of a one-line message.")
     private boolean debug;
 
+    @Spec
+    private CommandSpec spec;
+
     public static void main(String[] args) {
-        color = isTerminal() && System.getenv("NO_COLOR") == null;
+        color = wantColor(args);
         CommandLine cmd = new CommandLine(new Main())
                 .setColorScheme(Help.defaultColorScheme(color ? Help.Ansi.ON : Help.Ansi.OFF))
                 .setExecutionExceptionHandler(Main::onExecutionError)
@@ -108,10 +128,35 @@ public final class Main implements Callable<Integer> {
         System.exit(cmd.execute(args));
     }
 
+    /**
+     * The colour scheme is needed before picocli parses anything (the help and the error messages use it),
+     * so --color is looked up by hand here; call() validates its value.
+     */
+    private static boolean wantColor(String[] args) {
+        for (int i = 0; i < args.length; i++) {
+            String when = args[i].startsWith("--color=") ? args[i].substring("--color=".length())
+                    : args[i].equals("--color") && i + 1 < args.length ? args[i + 1]
+                    : "";
+            if (when.equals("always")) {
+                return true;
+            }
+            if (when.equals("never")) {
+                return false;
+            }
+        }
+        return isTerminal() && System.getenv("NO_COLOR") == null;
+    }
+
     @Override
     public Integer call() throws IOException {
+        if (!List.of("auto", "always", "never").contains(colorMode)) {
+            throw new ParameterException(spec.commandLine(),
+                    "Invalid value for option '--color': '" + colorMode + "' (expected auto, always or never)");
+        }
         Instant start = Instant.now();
-        System.err.println("start: " + start);
+        if (timing) {
+            System.err.println("start: " + start);
+        }
 
         JsonMapper mapper = JsonMapper.builder().build();
         // readValues() steps into the top-level array and binds one element per next().
@@ -123,10 +168,12 @@ public final class Main implements Callable<Integer> {
                     .stream(Spliterators.spliteratorUnknownSize(elements, Spliterator.ORDERED), false)
                     .toList();
         }
-        print(items, System.out);
+        print(items, System.out, dateOnly);
 
-        Instant end = Instant.now();
-        System.err.println("end:   " + end + ", took " + Duration.between(start, end).toMillis() + " ms");
+        if (timing) {
+            Instant end = Instant.now();
+            System.err.println("end:   " + end + ", took " + Duration.between(start, end).toMillis() + " ms");
+        }
         return EXIT_OK;
     }
 
@@ -200,11 +247,11 @@ public final class Main implements Callable<Integer> {
 
     // ------------------------------------------------------------------ table
 
-    static void print(List<Item> items, PrintStream out) {
+    static void print(List<Item> items, PrintStream out, boolean dateOnly) {
         List<Column> columns = new ArrayList<>(List.of(
                 new Column("id", true, item -> text(item.id())),
                 new Column("name", true, item -> text(item.name())),
-                new Column("createdAt", true, item -> text(item.createdAt()))));
+                new Column("createdAt", true, item -> dateOnly ? date(item.createdAt()) : text(item.createdAt()))));
 
         // One extra column per unknown property, in order of first appearance, name in double quotes.
         items.stream()
@@ -250,6 +297,10 @@ public final class Main implements Callable<Integer> {
             }
             out.println(rule);
         }
+    }
+
+    private static String date(Instant instant) {
+        return instant == null ? "" : LocalDate.ofInstant(instant, ZoneOffset.UTC).toString();
     }
 
     private static String text(Object value) {

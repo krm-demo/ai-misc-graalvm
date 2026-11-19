@@ -62,3 +62,7 @@ jobs:
         run: ./json-table-jq.sh sample.json | diff - native.txt
       - name: Help, exit codes and error messages (native)
         run: ./smoke-test.sh target/json-table
+      - name: Coloured example for the documentation
+        run: |
+          target/json-table --color=always --date-only sample.json | tee showcase.ansi
+          echo "SHOWCASE-BASE64: $(base64 < showcase.ansi | tr -d '\n')"
