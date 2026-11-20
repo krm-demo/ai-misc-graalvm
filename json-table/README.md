@@ -177,7 +177,7 @@ Shared CI machines are noisy, the macOS ones most of all.
 - Go was the fastest at every input size and on every platform.
 - Corretto, Oracle JDK and Zulu could not be told apart.
 - On small inputs the native executable started about 50 times faster than the same jar on a JVM
-  (about 20 times on macOS), on a par with jq.
+  (somewhat less on macOS), on a par with jq.
 - On 100,000 objects the native executable and the JVMs were close, and Node.js was about twice as fast as both.
 - jq fell far behind on large inputs, because the table layout is written in the jq language.
 

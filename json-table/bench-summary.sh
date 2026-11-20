@@ -31,7 +31,7 @@ if [ -s bench.json ]; then
   jq -r '
     def stats: if has("mean") then . else .summary.time_wall_clock end;
     def human: if . >= 1 then (. * 100 | round / 100 | tostring) + " s" elif . >= 0.01 then (. * 10000 | round / 10 | tostring) + " ms" else (. * 100000 | round / 100 | tostring) + " ms" end;
-    .results |= map(. as $r | stats + {command: ($r.command // $r.name)})
+    .results |= map(. as $r | stats + {command: ($r.name // $r.command)})
     | (.results | map(.mean) | min) as $best
     | "| Candidate | Mean | ± | Min | Max | Relative |",
       "| :--- | ---: | ---: | ---: | ---: | ---: |",

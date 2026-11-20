@@ -49,7 +49,7 @@ def normalize(result):
         stats = (result.get("summary") or {}).get("time_wall_clock") or {}
     factor = UNITS.get(stats.get("unit", "second"), 1.0)
     scaled = lambda key: stats[key] * factor if isinstance(stats.get(key), (int, float)) else None
-    return {"command": result.get("command") or result.get("name"), "mean": scaled("mean"), "stddev": scaled("stddev")}
+    return {"command": result.get("name") or result.get("command"), "mean": scaled("mean"), "stddev": scaled("stddev")}
 
 
 def load(results_dir):
