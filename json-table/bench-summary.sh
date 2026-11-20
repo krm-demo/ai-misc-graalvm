@@ -27,9 +27,12 @@ several times after warm-up runs. The table is sorted, fastest first; "Relative"
 MD
 # The table is built from hyperfine's JSON, because its own Markdown layout differs between versions.
 if [ -s bench.json ]; then
+  # hyperfine 1.x: .mean at the top of each result; 2.x (JSON schema 2): .summary.time_wall_clock.mean
   jq -r '
+    def stats: if has("mean") then . else .summary.time_wall_clock end;
     def human: if . >= 1 then (. * 100 | round / 100 | tostring) + " s" elif . >= 0.01 then (. * 10000 | round / 10 | tostring) + " ms" else (. * 100000 | round / 100 | tostring) + " ms" end;
-    (.results | map(.mean) | min) as $best
+    .results |= map(. as $r | stats + {command: ($r.command // $r.name)})
+    | (.results | map(.mean) | min) as $best
     | "| Candidate | Mean | ± | Min | Max | Relative |",
       "| :--- | ---: | ---: | ---: | ---: | ---: |",
       (.results | sort_by(.mean)[]

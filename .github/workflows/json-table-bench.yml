@@ -87,6 +87,7 @@ jobs:
           python-version: '3.14'
 
       - name: Build the jar, the native executable and the Go executable
+        timeout-minutes: 20
         run: |
           mvn -B -ntp -Pnative package
           go build -C alt/go -o ../../target/json-table-go .

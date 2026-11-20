@@ -3,7 +3,7 @@
 
 Usage: bench-report.py RESULTS_DIR > report.md
 
-RESULTS_DIR holds one folder per matrix job, named bench-<os>-<rows>, as downloaded by
+RESULTS_DIR holds one folder per matrix job (hyperfine 1.x and 2.x JSON both work), named bench-<os>-<rows>, as downloaded by
 actions/download-artifact. Each folder has bench.json (hyperfine), machine.txt, versions.txt,
 data-size.txt and sample-output.txt. Missing folders or files show up as gaps, not errors.
 
@@ -39,6 +39,19 @@ def read(path):
         return ""
 
 
+UNITS = {"second": 1.0, "millisecond": 1e-3, "microsecond": 1e-6, "nanosecond": 1e-9}
+
+
+def normalize(result):
+    """hyperfine 1.x has mean/stddev at the top of each result; 2.x (JSON schema 2) under summary.time_wall_clock."""
+    stats = result
+    if "mean" not in result:
+        stats = (result.get("summary") or {}).get("time_wall_clock") or {}
+    factor = UNITS.get(stats.get("unit", "second"), 1.0)
+    scaled = lambda key: stats[key] * factor if isinstance(stats.get(key), (int, float)) else None
+    return {"command": result.get("command") or result.get("name"), "mean": scaled("mean"), "stddev": scaled("stddev")}
+
+
 def load(results_dir):
     """Returns {platform: {rows: {"results": {command: result}, "dir": Path}}}."""
     found = {}
@@ -47,7 +60,11 @@ def load(results_dir):
             folder = Path(results_dir) / f"bench-{platform}-{rows}"
             text = read(folder / "bench.json")
             if text:
-                results = {r["command"]: r for r in json.loads(text)["results"]}
+                results = {}
+                for raw in json.loads(text)["results"]:
+                    result = normalize(raw)
+                    if result["mean"] is not None:
+                        results[result["command"]] = result
                 found.setdefault(platform, {})[rows] = {"results": results, "dir": folder}
     return found
 
