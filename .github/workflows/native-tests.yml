@@ -25,7 +25,7 @@ jobs:
           cache: 'maven'
 
       - name: Tests on the JVM
-        run: mvn -B -ntp test
+        run: mvn -B -ntp -U test
 
       - name: Tests as a native binary
         run: mvn -B -ntp -Pnative test
@@ -58,10 +58,10 @@ jobs:
           cache: 'maven'
 
       - name: Tests on the JVM
-        run: mvn -B -ntp test
+        run: mvn -B -ntp -U test
 
       - name: Tests as a native binary
-        run: mvn -B -ntp -PnativeTest test
+        run: mvn -B -ntp -U -PnativeTest test
 
       - name: Case results
         if: always()
