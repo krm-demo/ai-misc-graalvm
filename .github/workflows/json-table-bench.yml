@@ -186,6 +186,9 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: write
+    defaults:
+      run:
+        working-directory: .
     env:
       GH_TOKEN: ${{ github.token }}
       TAG: json-table-bench-${{ github.run_number }}
