@@ -1,57 +1,57 @@
 # ai-misc-graalvm
-Miscellaneous examples with Graal-VM
 
-## Jackson in a GraalVM native image
+Experiments with Jackson and GraalVM native images, and a small start-up benchmark of the JVM,
+a GraalVM native executable, jq, Go, Node.js and Python.
 
-`JacksonNativeImageTest` runs a set of Jackson use cases twice: on the JVM and as a native binary.
+| Part | Question | Where |
+| :--- | :--- | :--- |
+| Jackson tests | Does ordinary reflection-based Jackson work in a native image? | [`src/`](src), [`spring-boot-binding/`](spring-boot-binding) |
+| Notes | What has to be registered, and the traps | [docs/jackson-native-image.md](docs/jackson-native-image.md) |
+| json-table | A small JSON-to-table tool, the same program in six technologies, and the benchmark | [json-table/README.md](json-table/README.md) |
+| Results | The latest benchmark report | **[Releases, latest](https://github.com/krm-demo/ai-misc-graalvm/releases/latest)** |
 
-| Kind of case | JVM | Native image |
-| --- | --- | --- |
-| Types listed in `reflect-config.json` (records, nested records, `TypeReference`, polymorphic subtypes, builder, JavaBean) | must work | must work |
-| Untyped `Map<String, Object>` / `JsonNode` | must work | must work |
-| Types that are not registered, including a nested one inside a registered record | must work | must fail |
+## Jackson in a native image
 
-A "must fail" test fails the build if the case starts working, so the table stays true.
+Yes, it works, with every Jackson feature we tried: records, nested types, builders, polymorphism, `TypeReference`.
+The one rule: **every class Jackson binds must be registered for reflection at build time**,
+including nested types, subtypes and builder classes. A missing registration does not fail the build;
+it fails when the binary runs, so the tests run as a native binary in CI.
 
-The registration lives in
-`src/main/resources/META-INF/native-image/org.krm-demo/ai-misc-graalvm/reflect-config.json`.
+- [`JacksonNativeImageTest`](src/test/java/org/krmdemo/graalvm/jackson/JacksonNativeImageTest.java): plain Jackson,
+  registration in a [`reflect-config.json`](src/main/resources/META-INF/native-image/org.krm-demo/ai-misc-graalvm/reflect-config.json).
+- [`SpringBindingNativeImageTest`](spring-boot-binding/src/test/java/org/krmdemo/graalvm/spring/SpringBindingNativeImageTest.java):
+  Spring Boot AOT with `@RegisterReflectionForBinding` and `RuntimeHintsRegistrar`.
 
-### Run
-
-```
-mvn test            # JVM only
-mvn -Pnative test   # JVM, then native (needs GraalVM with native-image)
-```
-
-Per-case results are written to `target/jackson-cases-jvm.txt` and `target/jackson-cases-native.txt`.
-The `native-tests` GitHub workflow runs both and prints the results in the run summary.
-
-## Spring Boot AOT and Jackson
-
-`spring-boot-binding/` is a separate Maven project (Spring Boot parent) with `SpringBindingNativeImageTest`.
-Every case calls Spring Boot's `ObjectMapper` by hand, as a DAO would for a JSON column.
-
-| How the type is known to Spring AOT | Native image |
-| --- | --- |
-| `@RegisterReflectionForBinding(Root.class)`, nested types not named | must work |
-| `RuntimeHintsRegistrar` using `BindingReflectionHintsRegistrar` | must work |
-| `@RequestBody` / return type of a `@RestController`, nothing registered by hand | must work |
-| Not known at all | must fail |
-| `@JsonSubTypes` subtypes behind a registered root | observed, not asserted: fails on Spring Boot 3.5.6, so name every subtype |
+Both run the same cases on the JVM and as a native binary, and assert which cases must fail without registration.
+Details, examples and a checklist: [docs/jackson-native-image.md](docs/jackson-native-image.md).
 
 ```
-cd spring-boot-binding
-mvn test               # JVM only
-mvn -PnativeTest test  # JVM, then native
+mvn test                                     # plain Jackson, JVM only
+mvn -Pnative test                            # JVM, then native (needs GraalVM)
+cd spring-boot-binding && mvn -PnativeTest test
 ```
 
-Results are written to `spring-boot-binding/target/spring-cases-*.txt` and shown in the workflow run summary.
-
-## json-table
-
-[`json-table/`](json-table/README.md) is a small command-line tool (Jackson 3, Picocli) that prints a JSON array of objects as a table,
-with the same program in jq, Go, Node.js and Python and a start-up benchmark of all of them on several JVMs and as a GraalVM native executable.
+## json-table and the benchmark
 
 ![json-table --date-only sample.json](json-table/docs/example.svg)
 
-See [json-table/README.md](json-table/README.md) for usage, the benchmark set-up and the results.
+[`json-table`](json-table/README.md) reads a JSON array of objects and prints it as a table
+(Java 21+, Jackson 3, Picocli; also built as a GraalVM native executable). The same program exists
+in jq + bash, Go, Node.js and Python, and all of them print byte-for-byte the same table.
+
+The [`json-table-bench`](.github/workflows/json-table-bench.yml) workflow times them on three platforms
+and three input sizes and publishes the combined report as a **[GitHub Release](https://github.com/krm-demo/ai-misc-graalvm/releases/latest)**.
+Releases are permanent; workflow runs and their summaries are deleted by GitHub after 90 days.
+
+- **Run it:** Actions, [`json-table-bench`](https://github.com/krm-demo/ai-misc-graalvm/actions/workflows/json-table-bench.yml), *Run workflow*;
+  it also runs on every push to `main` that changes code under `json-table/`.
+- **Read it:** [the latest release](https://github.com/krm-demo/ai-misc-graalvm/releases/latest); the 5 newest reports are kept.
+- **Understand it:** how the benchmark works and which technology suits which job: [json-table/README.md](json-table/README.md#benchmark).
+
+## Workflows
+
+| Workflow | Runs on | What it checks or produces |
+| :--- | :--- | :--- |
+| [`native-tests`](.github/workflows/native-tests.yml) | push to `main`, pull requests | the Jackson and Spring Boot cases, on the JVM and as native binaries; per-case results in the run summary |
+| [`json-table`](.github/workflows/json-table.yml) | push to `main` and pull requests under `json-table/` | builds the jar and the native executable, compares their output with each other and with the jq script, runs the command-line smoke test |
+| [`json-table-bench`](.github/workflows/json-table-bench.yml) | push to `main` under `json-table/`, by hand | the benchmark; publishes the report as a release |

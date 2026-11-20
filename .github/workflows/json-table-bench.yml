@@ -5,17 +5,27 @@ run-name: json-table-bench №${{ github.run_number }} (${{ github.event_name }}
 # executable, and of the same program written with jq, Go, Node.js and Python.
 # All candidates of one job run on the same machine, so only numbers inside one job
 # are comparable. The matrix varies the platform and the size of the input.
-# Each job writes its report to the run summary (see json-table/bench-summary.sh).
+# Each job writes its own report to the run summary (json-table/bench-summary.sh).
+# The final "report" job combines all jobs into one report (json-table/bench-report.py),
+# writes it to the run summary and publishes it as a GitHub Release, keeping the 5 newest.
+# Releases are kept forever; workflow runs, their summaries and artifacts expire after 90 days.
 
 on:
-  pull_request:
+  push:
+    branches: [main]
     paths:
       - 'json-table/**'
+      - '!json-table/**/*.md'
+      - '!json-table/docs/**'
       - '.github/workflows/json-table-bench.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: json-table-bench
+  cancel-in-progress: false
 
 defaults:
   run:
@@ -95,6 +105,7 @@ jobs:
             id: "p-\(.)", name: "Plan number \(.)", createdAt: "2026-11-01T09:30:00Z",
             owner: "team-\(. % 7)", limits: {min: ., max: (. * 2)}, tags: ["weekly", "auto"]
           }]' > data.json
+          wc -c < data.json | tr -d ' ' > data-size.txt
           ls -l data.json
 
       - name: Machine and versions
@@ -163,4 +174,58 @@ jobs:
             json-table/bench.json
             json-table/versions.txt
             json-table/machine.txt
+            json-table/data-size.txt
+            json-table/sample-output.txt
           if-no-files-found: ignore
+
+  report:
+    name: Combined report and release
+    needs: bench
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: json-table-bench-${{ github.run_number }}
+      KEEP: 5
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: bench-*
+          path: results
+
+      - name: Build the report
+        env:
+          RUN_NUMBER: ${{ github.run_number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          COMMIT_SHA: ${{ github.sha }}
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: |
+          export RUN_DATE=$(date -u +%Y-%m-%d)
+          python3 json-table/bench-report.py results > report.md
+          cat report.md >> "$GITHUB_STEP_SUMMARY"
+          (cd results && zip -qr ../bench-results.zip .)
+
+      - name: Publish the release
+        run: |
+          # A re-run of the same workflow run replaces its release.
+          gh release delete "$TAG" --cleanup-tag --yes 2>/dev/null || true
+          gh release create "$TAG" report.md bench-results.zip \
+            --target "$GITHUB_SHA" \
+            --title "json-table benchmark №${{ github.run_number }} ($(date -u +%Y-%m-%d))" \
+            --notes-file report.md \
+            --latest
+          echo "Published ${{ github.server_url }}/${{ github.repository }}/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep the ${{ env.KEEP }} newest benchmark releases
+        run: |
+          gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+            --jq '.[] | select(.tag_name | startswith("json-table-bench-")) | "\(.created_at) \(.tag_name)"' \
+            | sort -r | tail -n +$((KEEP + 1)) | while read -r _ tag; do
+              echo "deleting $tag"
+              gh release delete "$tag" --cleanup-tag --yes
+            done

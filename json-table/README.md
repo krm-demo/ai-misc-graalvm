@@ -127,75 +127,86 @@ They print `createdAt` as it is written in the input, while Java parses it into 
 
 ## Benchmark
 
-The [`json-table-bench`](../.github/workflows/json-table-bench.yml) workflow measures the **whole process**:
-starting the runtime, reading and parsing the file, building the table and writing it to a discarded output.
+The [`json-table-bench`](../.github/workflows/json-table-bench.yml) workflow times all nine candidates:
+the same jar on Corretto 25, Oracle JDK 25, Zulu 25 and GraalVM 25, the GraalVM native executable,
+the jq script, Go, Node.js 24 and Python 3.14.
 
-- **Tool:** [hyperfine](https://github.com/sharkdp/hyperfine), 2 warm-up runs, then 15 timed runs (7 for the largest input).
-- **Matrix:** 3 platforms (`ubuntu-latest`, `ubuntu-24.04-arm`, `macos-latest`) x 3 input sizes (10, 1,000 and 100,000 objects; the largest file is 24 MB).
-- **Candidates:** the same jar on Corretto 25, Oracle JDK 25, Zulu 25 and GraalVM 25; the GraalVM native executable; jq; Go; Node.js 24; Python 3.14.
-- **Fairness:** all candidates of one job run on the same machine, and the job first checks that they all print the same table.
-- **Report:** every job writes its table, the sources it used, the sample input and output, and the versions to the run summary ([`bench-summary.sh`](bench-summary.sh)).
+### Where the results are
 
-### Results
+**[Latest benchmark report](https://github.com/krm-demo/ai-misc-graalvm/releases/latest)**, published as a GitHub Release.
+[All reports](https://github.com/krm-demo/ai-misc-graalvm/releases): the 5 newest are kept.
 
-Mean time per run, from [run №4](https://github.com/krm-demo/ai-misc-graalvm/actions/runs/44612755713) (commit `bb9d597`, 2026-11-19). Rows are sorted by the 1,000-row column.
+Each report has the result tables for every platform and input size, how many times the native
+executable beats the JVM, the sources at that commit, the sample input and output, the machine and
+the versions of every runtime. The raw `hyperfine` results are attached as `bench-results.zip`.
 
-**Linux x64** (`ubuntu-latest`, AMD EPYC 7763)
+The same report is also in the summary of the workflow run, but GitHub deletes workflow runs, their
+summaries and artifacts after 90 days, so the release is the copy that stays.
 
-| Candidate | 10 rows | 1,000 rows | 100,000 rows |
-| :--- | ---: | ---: | ---: |
-| Go | 1.7 ms | 6.7 ms | 542 ms |
-| Node.js 24 | 29.1 ms | 43.7 ms | 1.19 s |
-| Python 3.14 | 23.5 ms | 44.2 ms | 2.84 s |
-| GraalVM 25 (native) | 9.6 ms | 45.8 ms | 2.70 s |
-| jq + bash | 10.3 ms | 132 ms | 12.96 s |
-| Oracle JDK 25 | 503 ms | 603 ms | 2.95 s |
-| GraalVM 25 (JIT) | 538 ms | 604 ms | 3.33 s |
-| Corretto 25 | 504 ms | 605 ms | 2.89 s |
-| Zulu 25 | 500 ms | 619 ms | 2.93 s |
+### How to run it
 
-**Linux ARM64** (`ubuntu-24.04-arm`, Neoverse-N2)
+- **By hand:** Actions, [`json-table-bench`](https://github.com/krm-demo/ai-misc-graalvm/actions/workflows/json-table-bench.yml), *Run workflow*.
+- **Automatically:** on every push to `main` that changes code under `json-table/` or the workflow itself;
+  changes to Markdown files and `docs/` do not start it.
 
-| Candidate | 10 rows | 1,000 rows | 100,000 rows |
-| :--- | ---: | ---: | ---: |
-| Go | 1.5 ms | 7.0 ms | 585 ms |
-| Node.js 24 | 24.3 ms | 42.2 ms | 1.20 s |
-| GraalVM 25 (native) | 8.8 ms | 43.0 ms | 2.87 s |
-| Python 3.14 | 20.6 ms | 43.4 ms | 2.48 s |
-| jq + bash | 7.9 ms | 136 ms | 13.29 s |
-| Corretto 25 | 448 ms | 660 ms | 2.68 s |
-| GraalVM 25 (JIT) | 479 ms | 670 ms | 4.12 s |
-| Oracle JDK 25 | 439 ms | 670 ms | 2.64 s |
-| Zulu 25 | 439 ms | 681 ms | 2.67 s |
+A run takes about 10 minutes.
 
-**macOS ARM64** (`macos-latest`, Apple M1 virtual machine)
+### How it works
 
-| Candidate | 10 rows | 1,000 rows | 100,000 rows |
-| :--- | ---: | ---: | ---: |
-| Go | 7.9 ms | 9.4 ms | 419 ms |
-| GraalVM 25 (native) | 39.0 ms | 40.1 ms | 2.47 s |
-| Python 3.14 | 75.2 ms | 74.0 ms | 1.94 s |
-| Node.js 24 | 99.8 ms | 84.6 ms | 987 ms |
-| jq + bash | 32.1 ms | 212 ms | 14.71 s |
-| GraalVM 25 (JIT) | 772 ms | 522 ms | 3.07 s |
-| Zulu 25 | 710 ms | 570 ms | 2.76 s |
-| Corretto 25 | 806 ms | 595 ms | 2.83 s |
-| Oracle JDK 25 | 744 ms | 782 ms | 2.63 s |
+```text
+json-table-bench
+├── bench  (matrix: 3 platforms x 3 input sizes = 9 jobs in parallel, each on its own machine)
+│   ├── install 4 JDKs, GraalVM, Go, Node.js, Python, hyperfine
+│   ├── build the jar, the native executable and the Go executable
+│   ├── generate data.json (10, 1,000 or 100,000 objects)
+│   ├── check that all candidates print byte-for-byte the same table
+│   ├── time every candidate with hyperfine (whole process: start, read, parse, print)
+│   └── write this job's report to the run summary, upload bench.json and friends
+└── report  (after all bench jobs, even if some failed)
+    ├── download the results of every job
+    ├── build one combined report (bench-report.py)
+    ├── write it to the run summary and publish it as release json-table-bench-<run number>
+    └── delete benchmark releases older than the 5 newest
+```
 
-### What the numbers say
+Numbers are comparable only inside one table column: each job gets a different machine.
+Shared CI machines are noisy, the macOS ones most of all.
 
-- **Go is the fastest** at every size and on every platform.
-- **The JVMs do not differ from each other.** Corretto, Oracle JDK and Zulu are within noise; GraalVM used as a JIT is slower on the largest input.
-- **Start-up is what a native image buys.** On a small input the native executable is about 50 times faster than the same code on a JVM on Linux (about 20 times on macOS) and on a par with jq.
-- **On a large input the JVM catches up.** With 100,000 objects the native executable and the JVMs are close to each other, and Node.js is more than twice as fast as both.
-- **jq is slow on the large input** because the table layout runs in the jq language; this says little about its JSON parser.
+### What we saw (November 2026)
 
-### How far to trust them
+- Go was the fastest at every input size and on every platform.
+- Corretto, Oracle JDK and Zulu could not be told apart.
+- On small inputs the native executable started about 50 times faster than the same jar on a JVM
+  (about 20 times on macOS), on a par with jq.
+- On 100,000 objects the native executable and the JVMs were close, and Node.js was about twice as fast as both.
+- jq fell far behind on large inputs, because the table layout is written in the jq language.
 
-- Shared CI machines are noisy. The macOS runs vary the most (there several 10-row runs of the JVMs came out slower than their 1,000-row runs), so read that table as a rough order only.
-- Compare numbers only inside one table column of one run: every job gets a different machine.
-- The Java program has not been profiled or tuned, so its time on the largest input is that of the first working version.
-- To repeat the measurement, start the workflow by hand (Actions, `json-table-bench`, "Run workflow") or push a change under `json-table/` in a pull request.
+## Which technology for which job
+
+This is a judgement from writing the same program six times, not a measurement.
+Effort: **low** = an afternoon for someone new to the tool, **high** = needs extra libraries, build set-up or care.
+
+| | Java on a JVM | Java native image | Go | Node.js | Python | jq + bash |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| Lines of code for json-table (without blank lines and comments) | ~300, with a full CLI and error handling | same code | ~220 | ~55 | ~65 | ~70 |
+| Libraries used here | Jackson, Picocli, Lombok | same | none | none | none | jq |
+| Build | `mvn package`, seconds | `native-image`, 1-2 min, needs GraalVM | `go build`, seconds | none | none | none |
+| What you ship | jar + a JRE | one executable per OS and CPU | one executable per OS and CPU, easy cross-compiling | script + Node.js | script + Python | script + jq |
+| Start-up (Linux, 10 rows) | 0.4-0.5 s | ~10 ms | ~2 ms | ~25 ms | ~20 ms | ~10 ms |
+| Large input (Linux, 100,000 rows) | ~3 s | ~3 s | ~0.6 s | ~1.2 s | ~2.5 s | ~13 s |
+| Effort for this simple task | medium: types, build file | medium-high: plus reflection metadata and native tests | medium: `encoding/json` loses the property order, so we wrote a token parser | **low** | **low** | low for queries, high for layout |
+| Typed models, validation, polymorphism | **low**: records + Jackson annotations | medium: every type registered | medium: struct tags, no unions | medium: needs TypeScript and a schema library | medium: dataclasses or pydantic | high |
+| Streaming files larger than memory | **low**: `MappingIterator`, used here | low | low: `json.Decoder` tokens | medium: needs a library | medium: needs a library (`ijson`) | high: `--stream` |
+| Long-running service | **best fit**: the JIT gets faster with time | fast start, lower peak speed | good | good | fair | not suitable |
+| Readability of our version | good, but the longest | same | most verbose | most compact | most compact | compact but cryptic |
+
+In short:
+
+- **One-off scripts and quick reports:** Python or Node.js. Least code, nothing to build.
+- **A command-line tool to hand to other people:** Go, or a Java native image if the team and the code are Java already.
+- **Complex data models in a JVM codebase:** Java with Jackson. Use the JVM for services; build a native image for CLIs,
+  serverless functions and anything that starts often. See [Jackson in a GraalVM native image](../docs/jackson-native-image.md).
+- **jq:** for querying and reshaping JSON in a shell pipeline, not for formatting output.
 
 ## Files
 
@@ -207,5 +218,6 @@ Mean time per run, from [run №4](https://github.com/krm-demo/ai-misc-graalvm/a
 | `run-jvm.sh`, `run-native.sh` | run one build and print the elapsed time |
 | `smoke-test.sh` | command-line checks |
 | `json-table-jq.sh`, `alt/` | the other implementations |
-| `bench-summary.sh` | the report written by each benchmark job |
+| `bench-summary.sh` | the report each benchmark job writes to its run summary |
+| `bench-report.py` | the combined report that is published as a release |
 | `docs/example.svg`, `docs/ansi2svg.py` | the picture above and the script that draws it from `--color=always` output |
